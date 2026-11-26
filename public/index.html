@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Street Legends</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+<div id="startOverlay">
+  <h1>STREET LEGENDS</h1>
+  <p>Open city · Drive · Shoot · Your partner Ally does what you ask</p>
+  <button id="playBtn">▶ Play</button>
+  <p class="small">WASD move · Mouse look · Shift run · E car · Hold click or F shoot · R reload · Q or wheel switch weapon · T type to Ally · V talk to Ally</p>
+</div>
+
+<div id="hud">
+  <div class="row"><span>HP</span><div class="bar"><div id="hpBar"></div></div></div>
+  <div class="row"><b id="cash">$500</b><span id="stars" class="stars">☆☆☆☆☆</span></div>
+  <div id="ally"></div>
+  <div id="speed"></div>
+  <div id="weapon"></div>
+</div>
+
+<div id="toast"></div>
+<div id="prompt"></div>
+<div id="crosshair">+</div>
+<div id="wasted" hidden>WASTED</div>
+
+<div id="chat">
+  <div id="chatLog"></div>
+  <div class="chatRow">
+    <input id="chatInput" hidden maxlength="200" placeholder="Tell Ally what to do, or type a cheat (Enter sends, Esc cancels)">
+    <button id="micBtn" title="Talk to Ally (V)">🎤</button>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
