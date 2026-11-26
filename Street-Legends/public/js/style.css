@@ -1,0 +1,170 @@
+[hidden] { display: none !important; }
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden;
+  background: #000; color: #fff;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+}
+body > canvas {
+  position: fixed; inset: 0; z-index: 0;
+  display: block; width: 100vw !important; height: 100vh !important;
+}
+
+/* ---------- Screens: only one shows at a time ---------- */
+#menu, #pause, #intro { position: fixed; inset: 0; display: none; }
+body.menu #menu { display: flex; }
+body.paused #pause { display: flex; }
+body.intro #intro { display: block; }
+
+#menu, #pause {
+  align-items: center; justify-content: center; z-index: 20;
+  background: radial-gradient(circle at 50% 30%, rgba(30, 18, 55, 0.55), rgba(0, 0, 0, 0.88));
+}
+#missionBoard {
+  position: fixed; inset: 0; z-index: 30; display: none;
+  align-items: center; justify-content: center; padding: 20px;
+  background: rgba(4, 7, 14, 0.82); backdrop-filter: blur(7px);
+}
+body.missions-open #missionBoard { display: flex; }
+.missionBox {
+  width: min(980px, 96vw); max-height: 92vh; overflow: auto;
+  padding: clamp(20px, 4vw, 38px); border: 1px solid rgba(255, 213, 74, 0.28);
+  border-radius: 20px; background: linear-gradient(145deg, #181827, #0b0c13 75%);
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.7);
+}
+.missionHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.missionHeader h2 { margin: 4px 0 0; font-size: clamp(2rem, 4vw, 2.8rem); }
+.eyebrow, .missionTag, .missionHudLabel { color: #ffd54a; font-size: 0.75rem; font-weight: 800; letter-spacing: 2px; }
+.eyebrow { margin: 0; }
+.missionIntro { max-width: 650px; margin: 10px 0 22px; color: #c9c4dd; line-height: 1.55; }
+.missionGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.missionCard {
+  display: flex; flex-direction: column; min-height: 235px; padding: 20px;
+  border: 1px solid #353346; border-radius: 14px; background: rgba(255, 255, 255, 0.035);
+}
+.missionCard h3 { margin: 12px 0 8px; font-size: 1.25rem; color: #fff; }
+.missionCard p { margin: 0; color: #bcb8cc; font-size: 0.95rem; line-height: 1.5; }
+.missionReward { display: flex; justify-content: space-between; margin: auto 0 14px; padding-top: 20px; color: #aaa6b8; }
+.missionReward b { color: #86efac; }
+.missionCard button, .closeButton {
+  border: 0; border-radius: 9px; cursor: pointer; font: inherit;
+}
+.missionCard button { padding: 11px 14px; background: #ffd54a; color: #111; font-weight: 800; }
+.missionCard button:hover, .closeButton:hover { filter: brightness(1.12); }
+.missionCard button:disabled { background: #343141; color: #a8a4b4; cursor: default; }
+.closeButton { padding: 10px 13px; background: #2b2640; color: #fff; font-size: 1.1rem; }
+.missionHint { margin: 18px 0 0; text-align: center; color: #9a96a8; font-size: 0.9rem; }
+.menuBox { text-align: center; padding: 30px; width: min(560px, 92%); }
+h1 {
+  margin: 0; font-size: clamp(2.2rem, 6vw, 4.6rem); letter-spacing: 6px;
+  color: #ffd54a; text-shadow: 0 0 24px #f59e0b;
+}
+h2 { color: #ffd54a; font-size: 2rem; }
+.tagline { color: #c9c4dd; margin: 12px 0 28px; }
+.menuBox button {
+  display: block; width: 100%; max-width: 340px; margin: 12px auto;
+  padding: 14px; font-size: 1.1rem; font-weight: bold;
+  border: none; border-radius: 10px; cursor: pointer;
+  background: #ffd54a; color: #111;
+}
+.menuBox button.secondary { background: #2b2640; color: #fff; font-weight: normal; }
+.menuBox button:hover { filter: brightness(1.12); }
+.controls { margin-top: 20px; color: #cfc9e6; font-size: 0.95rem; line-height: 1.7; }
+
+/* ---------- Opening cutscene ---------- */
+#intro { z-index: 15; pointer-events: none; }
+#intro .letter {
+  position: absolute; left: 0; right: 0; height: 13vh; background: #000;
+}
+#intro .top { top: 0; }
+#intro .bottom { bottom: 0; }
+#titleCard {
+  position: absolute; top: 42%; width: 100%; text-align: center;
+  font-size: clamp(2rem, 5vw, 3.6rem); font-weight: bold; letter-spacing: 6px;
+  color: #ffd54a; text-shadow: 0 0 18px #000; opacity: 0; transition: opacity 0.8s;
+}
+#titleCard.show { opacity: 1; }
+#subtitle {
+  position: absolute; bottom: 17vh; left: 50%; transform: translateX(-50%);
+  width: min(780px, 92%); padding: 14px 20px; border-radius: 10px;
+  background: rgba(0, 0, 0, 0.65); font-size: 1.15rem; line-height: 1.5; text-align: center;
+  text-shadow: 0 0 8px #000;
+}
+#subtitle.ally { color: #86efac; }
+#btnSkip {
+  position: absolute; right: 18px; top: 18px; pointer-events: auto;
+  padding: 8px 14px; border: none; border-radius: 8px; cursor: pointer;
+  background: rgba(0, 0, 0, 0.6); color: #fff;
+}
+
+/* ---------- In-game UI ---------- */
+#gameUI { display: none; }
+body.playing #gameUI, body.intro #gameUI { display: block; }
+body:not(.playing) #hud,
+body:not(.playing) #crosshair,
+body:not(.playing) #prompt,
+body:not(.playing) #toast { display: none; }
+
+#hud {
+  position: fixed; top: 16px; left: 16px; min-width: min(300px, calc(100vw - 32px));
+  background: rgba(0, 0, 0, 0.66); padding: 13px 16px; border: 1px solid rgba(255,255,255,.1); border-radius: 12px;
+  pointer-events: none;
+}
+.row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.bar { flex: 1; height: 10px; background: #333; border-radius: 6px; overflow: hidden; }
+#hpBar { height: 100%; width: 100%; background: linear-gradient(90deg, #ef4444, #f87171); transition: width 0.2s; }
+.stars { color: #ffd54a; letter-spacing: 2px; }
+#ally { color: #86efac; font-size: 0.9rem; margin-top: 6px; }
+#speed { font-size: 1.1rem; font-weight: bold; margin-top: 4px; }
+#weapon { font-weight: bold; margin-top: 4px; color: #fde68a; }
+#missionHud { display: flex; flex-direction: column; gap: 3px; margin-top: 11px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.16); }
+#missionName { font-size: 1rem; color: #fff; }
+#missionObjective { color: #c9c4dd; font-size: 0.88rem; line-height: 1.35; }
+
+#toast {
+  position: fixed; top: 14%; width: 100%; text-align: center;
+  font-size: 1.2rem; font-weight: bold; color: #ffd54a;
+  text-shadow: 0 0 10px #000; pointer-events: none;
+}
+#prompt {
+  position: fixed; bottom: 22%; width: 100%; text-align: center;
+  font-size: 1.1rem; text-shadow: 0 0 8px #000; pointer-events: none;
+}
+#crosshair {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  color: rgba(255, 255, 255, 0.7); font-size: 22px; pointer-events: none;
+}
+#wasted {
+  position: fixed; inset: 0; background: rgba(120, 0, 0, 0.55);
+  align-items: center; justify-content: center;
+  font-size: 4rem; font-weight: bold; letter-spacing: 6px; pointer-events: none;
+}
+#wasted:not([hidden]) { display: flex; }
+
+#chat { position: fixed; left: 12px; bottom: 12px; width: min(460px, 70vw); }
+#chatLog {
+  max-height: 180px; overflow-y: auto; pointer-events: none;
+  background: rgba(0, 0, 0, 0.45); border-radius: 10px; padding: 8px; font-size: 0.9rem;
+}
+#chatLog .line { margin: 3px 0; }
+.line.you { color: #93c5fd; }
+.line.ally { color: #86efac; }
+.chatRow { display: flex; gap: 8px; margin-top: 6px; }
+#chatInput {
+  flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #444;
+  background: #0b0b12; color: #fff; font-size: 1rem;
+}
+#micBtn {
+  padding: 0 14px; border: none; border-radius: 8px;
+  background: #2a2a2a; color: #fff; cursor: pointer; font-size: 1.1rem;
+}
+#micBtn.live { background: #c0392b; }
+
+@media (max-width: 720px) {
+  .missionGrid { grid-template-columns: 1fr; }
+  .missionCard { min-height: 0; }
+  #missionBoard { padding: 10px; }
+  .missionBox { max-height: 96vh; padding: 20px; }
+  #chat { width: calc(100vw - 32px); left: 16px; bottom: 12px; }
+  #chatLog { max-height: 120px; }
+}

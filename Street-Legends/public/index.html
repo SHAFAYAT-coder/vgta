@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Street Legends</title>
+<link rel="stylesheet" href="js/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body class="menu">
+
+<!-- MAIN MENU -->
+<div id="menu">
+  <div class="menuBox">
+    <h1>STREET LEGENDS</h1>
+    <p class="tagline">A city that never sleeps. Your partner Ally walks beside you.</p>
+    <button id="btnStart">▶ Start Game</button>
+    <button id="btnMissions" class="secondary">★ Missions</button>
+    <button id="btnControls" class="secondary">Controls</button>
+    <button id="btnFull" class="secondary">⛶ Full screen</button>
+    <div id="controls" class="controls" hidden>
+      <p><b>WASD</b> move · <b>Shift</b> run · <b>Mouse</b> look</p>
+      <p><b>E</b> enter or exit a car · <b>Space</b> handbrake</p>
+      <p><b>Hold click / F</b> shoot · <b>R</b> reload · <b>Q</b> or mouse wheel switch · <b>1-8</b> pick weapon</p>
+      <p><b>T</b> type to Ally · <b>V</b> talk to Ally · <b>M</b> missions · <b>Esc</b> pause</p>
+    </div>
+  </div>
+</div>
+
+<!-- OPENING CUTSCENE -->
+<div id="intro">
+  <div class="letter top"></div>
+  <div class="letter bottom"></div>
+  <div id="titleCard"></div>
+  <div id="subtitle"></div>
+  <button id="btnSkip">Skip ⏭</button>
+</div>
+
+<!-- PAUSE MENU -->
+<div id="pause">
+  <div class="menuBox">
+    <h2>Paused</h2>
+    <button id="btnResume">▶ Resume</button>
+    <button id="btnPauseMissions" class="secondary">★ Missions</button>
+    <button id="btnPauseFull" class="secondary">⛶ Full screen</button>
+    <button id="btnQuitMenu" class="secondary">Main menu</button>
+  </div>
+</div>
+
+<!-- MISSION BOARD -->
+<div id="missionBoard" aria-label="Mission board" aria-hidden="true">
+  <section class="missionBox">
+    <div class="missionHeader">
+      <div>
+        <p class="eyebrow">STREET LEGENDS · CITY JOBS</p>
+        <h2>Missions</h2>
+      </div>
+      <button id="btnCloseMissions" class="closeButton" aria-label="Close missions">✕</button>
+    </div>
+    <p class="missionIntro">Pick a job to get a clear objective and a waypoint in the city. You can switch missions any time.</p>
+    <div class="missionGrid">
+      <article class="missionCard">
+        <span class="missionTag">STORY</span>
+        <h3>First Deposit</h3>
+        <p>Head across town to the Bank and see what the city has in store.</p>
+        <div class="missionReward">Reward <b>$300</b></div>
+        <button data-mission-start="bank_run">Start mission</button>
+      </article>
+      <article class="missionCard">
+        <span class="missionTag">ACTION</span>
+        <h3>Block Patrol</h3>
+        <p>Take down three thugs. Ally can help if you ask her to attack.</p>
+        <div class="missionReward">Reward <b>$500</b></div>
+        <button data-mission-start="block_patrol">Start mission</button>
+      </article>
+      <article class="missionCard">
+        <span class="missionTag">EXPLORATION</span>
+        <h3>City Tour</h3>
+        <p>Visit the Park, then head to the Garage to finish your tour.</p>
+        <div class="missionReward">Reward <b>$400</b></div>
+        <button data-mission-start="city_tour">Start mission</button>
+      </article>
+    </div>
+    <p class="missionHint">Press <b>M</b> any time to open this board.</p>
+  </section>
+</div>
+
+<!-- IN-GAME UI (shown during the intro and the game) -->
+<div id="gameUI">
+  <div id="hud">
+    <div class="row"><span>HP</span><div class="bar"><div id="hpBar"></div></div></div>
+    <div class="row"><b id="cash">$500</b><span id="stars" class="stars">☆☆☆☆☆</span></div>
+    <div id="ally"></div>
+    <div id="speed"></div>
+    <div id="weapon"></div>
+    <div id="missionHud"><span class="missionHudLabel">MISSION</span><b id="missionName">Free roam</b><span id="missionObjective">Press M to choose a mission</span></div>
+  </div>
+
+  <div id="toast"></div>
+  <div id="prompt"></div>
+  <div id="crosshair">+</div>
+  <div id="wasted" hidden>WASTED</div>
+
+  <div id="chat">
+    <div id="chatLog"></div>
+    <div class="chatRow">
+      <input id="chatInput" hidden maxlength="200" placeholder="Tell Ally what to do, or type a cheat">
+      <button id="micBtn" title="Talk to Ally (V)">🎤</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

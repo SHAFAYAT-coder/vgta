@@ -1,8 +1,8 @@
 // Map, roads, buildings, trees, landmarks and collision helpers
-export const MAP = 90;
+export const MAP = 150;
 export const ROAD_W = 9;
-export const ROADS = [-60, -30, 0, 30, 60];
-const BLOCKS = [-75, -45, -15, 15, 45, 75];
+export const ROADS = [-120, -80, -40, 0, 40, 80, 120];
+const BLOCKS = [-140, -100, -60, -20, 20, 60, 100, 140];
 
 export const LANDMARKS = {
   Bank:             { x: 30,  z: -30, color: 0x22c55e },

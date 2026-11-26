@@ -24,7 +24,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(SKY);
 scene.fog = new THREE.Fog(SKY, 110, 280);
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 400);
+const camera = new THREE.PerspectiveCamera(54, window.innerWidth / window.innerHeight, 0.1, 500);
 scene.add(new THREE.HemisphereLight(0xdbeeff, 0x4a6b3a, 0.9));
 const sun = new THREE.DirectionalLight(0xfff1d6, 1.0);
 sun.position.set(60, 120, 40);
@@ -36,6 +36,39 @@ scene.add(sun);
 
 // ---------- World and characters ----------
 const world = buildWorld(scene);
+const MISSION_DEFS = [
+  {
+    id: 'bank_run', title: 'First Deposit', reward: 300,
+    objectives: [{ type: 'visit', landmark: 'Bank', label: 'Reach the Bank' }]
+  },
+  {
+    id: 'block_patrol', title: 'Block Patrol', reward: 500,
+    objectives: [{ type: 'thugs', count: 3, label: 'Defeat 3 thugs' }]
+  },
+  {
+    id: 'city_tour', title: 'City Tour', reward: 400,
+    objectives: [
+      { type: 'visit', landmark: 'Park', label: 'Visit the Park' },
+      { type: 'visit', landmark: 'Garage', label: 'Then visit the Garage' }
+    ]
+  }
+];
+const missionState = { activeId: null, objectiveIndex: 0, thugKills: 0, completed: new Set() };
+const missionMarker = new THREE.Group();
+const markerBeam = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.22, 0.22, 24, 12),
+  new THREE.MeshBasicMaterial({ color: 0x45e4ff, transparent: true, opacity: 0.32, depthWrite: false })
+);
+markerBeam.position.y = 12;
+const markerRing = new THREE.Mesh(
+  new THREE.RingGeometry(3.4, 3.9, 36),
+  new THREE.MeshBasicMaterial({ color: 0x45e4ff, side: THREE.DoubleSide })
+);
+markerRing.rotation.x = -Math.PI / 2;
+markerRing.position.y = 0.08;
+missionMarker.add(markerBeam, markerRing);
+missionMarker.visible = false;
+scene.add(missionMarker);
 const player = new Player(scene);
 const companion = new Companion(scene);
 const arsenal = new Arsenal();
@@ -101,6 +134,146 @@ function toast(text, ms = 2500) {
   $('toast').textContent = text;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { $('toast').textContent = ''; }, ms);
+}
+
+function activeMission() {
+  return MISSION_DEFS.find(m => m.id === missionState.activeId) || null;
+}
+
+function activeObjective() {
+  const mission = activeMission();
+  return mission ? mission.objectives[missionState.objectiveIndex] || null : null;
+}
+
+function nearestLivingThug() {
+  let best = null, bestDistance = Infinity;
+  for (const thug of thugs) {
+    if (!thug.alive) continue;
+    const distance = Math.hypot(thug.x - player.x, thug.z - player.z);
+    if (distance < bestDistance) { best = thug; bestDistance = distance; }
+  }
+  return best;
+}
+
+function updateMissionMarker() {
+  const objective = activeObjective();
+  if (!objective) {
+    missionMarker.visible = false;
+    return null;
+  }
+  let target = null;
+  if (objective.type === 'visit') target = world.landmarks[objective.landmark];
+  else if (objective.type === 'thugs') target = nearestLivingThug();
+  if (!target) {
+    missionMarker.visible = false;
+    return null;
+  }
+  missionMarker.position.set(target.x, 0, target.z);
+  missionMarker.visible = true;
+  return target;
+}
+
+function updateMissionHud() {
+  const mission = activeMission();
+  const objective = activeObjective();
+  if (!mission || !objective) {
+    $('missionName').textContent = 'Free roam';
+    $('missionObjective').textContent = 'Press M to choose a mission';
+    return;
+  }
+  $('missionName').textContent = mission.title;
+  if (objective.type === 'thugs') {
+    const target = updateMissionMarker();
+    const distance = target ? ` · ${Math.round(Math.hypot(target.x - player.x, target.z - player.z))}m away` : '';
+    $('missionObjective').textContent = `${objective.label} (${missionState.thugKills}/${objective.count})${distance}`;
+  } else {
+    const target = world.landmarks[objective.landmark];
+    const distance = Math.round(Math.hypot(target.x - player.x, target.z - player.z));
+    updateMissionMarker();
+    $('missionObjective').textContent = `${objective.label} · ${distance}m away`;
+  }
+}
+
+function renderMissionBoard() {
+  for (const button of document.querySelectorAll('[data-mission-start]')) {
+    const id = button.dataset.missionStart;
+    const completed = missionState.completed.has(id);
+    button.disabled = completed;
+    button.textContent = completed ? 'Completed' : (missionState.activeId === id ? 'Restart mission' : 'Start mission');
+  }
+}
+
+function openMissionBoard() {
+  document.body.classList.add('missions-open');
+  $('missionBoard').setAttribute('aria-hidden', 'false');
+  renderMissionBoard();
+  if (state.started) {
+    document.body.classList.remove('playing');
+    document.body.classList.add('paused');
+  }
+  if (document.pointerLockElement === renderer.domElement) document.exitPointerLock();
+}
+
+function closeMissionBoard() {
+  document.body.classList.remove('missions-open');
+  $('missionBoard').setAttribute('aria-hidden', 'true');
+}
+
+function toggleMissionBoard() {
+  if (document.body.classList.contains('missions-open')) closeMissionBoard();
+  else openMissionBoard();
+}
+
+function finishMission() {
+  const mission = activeMission();
+  if (!mission) return;
+  missionState.completed.add(mission.id);
+  state.cash += mission.reward;
+  missionState.activeId = null;
+  missionState.objectiveIndex = 0;
+  missionState.thugKills = 0;
+  missionMarker.visible = false;
+  renderMissionBoard();
+  toast(`Mission complete! +$${mission.reward}`, 3500);
+}
+
+function advanceMissionObjective() {
+  const mission = activeMission();
+  if (!mission) return;
+  missionState.objectiveIndex++;
+  if (missionState.objectiveIndex >= mission.objectives.length) {
+    finishMission();
+    return;
+  }
+  const next = mission.objectives[missionState.objectiveIndex];
+  toast(`Objective complete! ${next.label}`, 2600);
+  updateMissionMarker();
+}
+
+function recordMissionThugKill() {
+  const objective = activeObjective();
+  if (!objective || objective.type !== 'thugs') return;
+  missionState.thugKills++;
+  if (missionState.thugKills >= objective.count) advanceMissionObjective();
+}
+
+function updateMissionProgress() {
+  const objective = activeObjective();
+  if (!objective || objective.type !== 'visit') return;
+  const target = world.landmarks[objective.landmark];
+  if (Math.hypot(target.x - player.x, target.z - player.z) < 10) advanceMissionObjective();
+}
+
+function startMission(id) {
+  const mission = MISSION_DEFS.find(m => m.id === id);
+  if (!mission || missionState.completed.has(id)) return;
+  missionState.activeId = id;
+  missionState.objectiveIndex = 0;
+  missionState.thugKills = 0;
+  updateMissionMarker();
+  closeMissionBoard();
+  if (!state.started) startGame();
+  else toast(`Mission started: ${mission.title}`, 2800);
 }
 
 function addChat(who, text, cls) {
@@ -219,6 +392,13 @@ function finishIntro(answers) {
   toast('Click the screen to take control', 4000);
 }
 
+function startGame() {
+  closeMissionBoard();
+  requestFull();
+  document.body.className = 'intro';
+  cutscene.start(INTRO_BEATS);
+}
+
 const cutscene = new Cutscene({
   title: text => {
     const el = $('titleCard');
@@ -232,18 +412,22 @@ const cutscene = new Cutscene({
   end: finishIntro
 });
 
-$('btnStart').onclick = () => {
-  requestFull();
-  document.body.className = 'intro';
-  cutscene.start(INTRO_BEATS);
-};
+$('btnStart').onclick = startGame;
+$('btnMissions').onclick = openMissionBoard;
+$('btnPauseMissions').onclick = openMissionBoard;
+$('btnCloseMissions').onclick = closeMissionBoard;
+for (const button of document.querySelectorAll('[data-mission-start]')) {
+  button.onclick = () => startMission(button.dataset.missionStart);
+}
 
 $('btnSkip').onclick = () => cutscene.skip();
 $('btnControls').onclick = () => { $('controls').hidden = !$('controls').hidden; };
 $('btnFull').onclick = toggleFull;
 $('btnPauseFull').onclick = toggleFull;
 $('btnResume').onclick = () => {
-  document.body.className = 'playing';
+  closeMissionBoard();
+  document.body.classList.remove('paused');
+  document.body.classList.add('playing');
   renderer.domElement.requestPointerLock();
 };
 $('btnQuitMenu').onclick = () => location.reload();
@@ -285,6 +469,7 @@ function runOver(v) {
     if (c.isThug) {
       state.cash += 150;
       toast('Hit and run! +$150', 2000);
+      recordMissionThugKill();
     } else {
       crime(2);
       toast('You hit a civilian!', 2000);
@@ -342,6 +527,7 @@ function onKill(target) {
   if (target.isThug) {
     state.cash += 150;
     toast('Thug down! +$150', 1800);
+    recordMissionThugKill();
   } else {
     crime(2);
     toast('Civilian down!', 1500);
@@ -742,6 +928,15 @@ window.addEventListener('keydown', e => {
     return;
   }
   if (state.chatOpen) return;
+  if (e.code === 'Escape' && document.body.classList.contains('missions-open')) {
+    closeMissionBoard();
+    return;
+  }
+  if (e.code === 'KeyM' && !e.repeat) {
+    e.preventDefault();
+    toggleMissionBoard();
+    return;
+  }
   if (['Space', 'Tab', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
   keys[e.code] = true;
   if (e.repeat || !state.started) return;
@@ -794,7 +989,8 @@ document.addEventListener('pointerlockchange', () => {
   const locked = document.pointerLockElement === renderer.domElement;
   if (locked) return;
   if (state.started && !state.chatOpen && document.body.classList.contains('playing')) {
-    document.body.className = 'paused';
+    document.body.classList.remove('playing');
+    document.body.classList.add('paused');
   }
 });
 
@@ -810,7 +1006,7 @@ function updateCamera(dt) {
   if (v) player.camYaw = wrap(player.camYaw + wrap(v.angle - player.camYaw) * Math.min(1, dt * 2));
   const tx = v ? v.x : player.x;
   const tz = v ? v.z : player.z;
-  const dist = v ? 10 : 5.5;
+  const dist = v ? 8.5 : 4.6;
   const cp = Math.cos(player.camPitch), sp = Math.sin(player.camPitch);
   camera.position.set(
     tx + Math.sin(player.camYaw) * cp * dist,
@@ -830,6 +1026,7 @@ function updateHud(t) {
   $('weapon').textContent = arsenal.label();
   $('ally').textContent = `Ally · ${companion.role}${companion.alive ? '' : ' (down)'} · ${Math.round(companion.hp)} HP · ${allyArsenal.current().name}`;
   $('speed').textContent = player.vehicle ? `${Math.round(Math.abs(player.vehicle.speed) * 3.6)} km/h` : '';
+  updateMissionHud();
 
   let prompt = '';
   if (player.vehicle) {
@@ -934,6 +1131,7 @@ function update(dt, t) {
   }
 
   player.sync();
+  updateMissionProgress();
   updateCamera(dt);
   updateHud(t);
 }
@@ -953,7 +1151,7 @@ function frame() {
       camera.lookAt(c.look[0], c.look[1], c.look[2]);
     }
   } else if (state.started) {
-    update(dt, t);
+    if (document.body.classList.contains('playing')) update(dt, t);
   } else {
     // Main menu: the camera slowly circles the city
     const a = t * 0.04;
