@@ -1,8 +1,9 @@
-// Game loop, controls, camera, HUD, weapons, cheats, police and Ally
+// Menu, intro cutscene, game loop, controls, camera, HUD, weapons, cheats, police and Ally
 import { ROADS, MAP, pushOut, buildWorld } from './world.js';
-import { Player, Vehicle, Companion, Thug, Civilian, wrap } from './entities.js';
+import { Player, Vehicle, Companion, Thug, Civilian, wrap, animateHuman } from './entities.js';
 import { askCompanion } from './ai.js';
 import { WEAPONS, CHEATS, CHEAT_BY_CODE, Arsenal } from './weapons.js';
+import { Cutscene } from './intro.js';
 
 const $ = id => document.getElementById(id);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -37,21 +38,22 @@ scene.add(sun);
 const world = buildWorld(scene);
 const player = new Player(scene);
 const companion = new Companion(scene);
-const arsenal = new Arsenal();       // your weapons
-const allyArsenal = new Arsenal();   // Ally's weapons
+const arsenal = new Arsenal();
+const allyArsenal = new Arsenal();
 const vehicles = [];
 const policeCars = [];
 const thugs = [];
 const civilians = [];
-const effects = [];                  // explosions
+const effects = [];
 
 const state = {
-  started: false, chatOpen: false, cash: 500,
+  started: false, chatOpen: false, cash: 500, name: 'Hunter',
   wanted: 0, lastCrime: -99, lastDecay: 0, lastPoliceSpawn: -99,
   deadAt: null, tracers: [], lastHud: 0, lastEmpty: -99, allyLast: -99
 };
 const keys = {};
 let mouseDown = false;
+let askResolver = null;
 
 function roadPoint(minD = 0, maxD = 999, from = null) {
   let fallback = null;
@@ -84,9 +86,10 @@ for (let i = 0; i < 14; i++) {
   civilians.push(new Civilian(scene, p.x, p.z));
 }
 
+// Starting positions (Ally starts on the road, then walks in during the intro)
 player.reset(0, 0);
-companion.x = 2;
-companion.z = 1;
+companion.x = -16;
+companion.z = 2;
 companion.sync();
 
 // ---------- UI ----------
@@ -118,6 +121,133 @@ function speak(text) {
   speechSynthesis.speak(u);
 }
 
+function openChat() {
+  state.chatOpen = true;
+  for (const k in keys) keys[k] = false;
+  mouseDown = false;
+  chatInput.hidden = false;
+  chatInput.value = '';
+  chatInput.focus();
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+
+function closeChat() {
+  state.chatOpen = false;
+  chatInput.hidden = true;
+  chatInput.blur();
+}
+
+// ---------- Fullscreen ----------
+function requestFull() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+}
+
+function toggleFull() {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else requestFull();
+}
+
+// ---------- Intro cutscene ----------
+// Ally's walk and the camera moves are scripted here. Edit or add beats to change the opening.
+const INTRO_BEATS = [
+  { type: 'cam', dur: 0.1,
+    from: { p: [-70, 80, 70], l: [0, 0, 0] }, to: { p: [-70, 80, 70], l: [0, 0, 0] } },
+  { type: 'title', text: 'STREET LEGENDS', dur: 3 },
+  { type: 'cam', dur: 8,
+    from: { p: [-70, 80, 70], l: [0, 0, 0] }, to: { p: [30, 60, -10], l: [10, 0, -20] } },
+  { type: 'cam', dur: 6,
+    from: { p: [30, 60, -10], l: [10, 0, -20] }, to: { p: [-4, 2.4, 10], l: [0, 1.4, 0] } },
+  { type: 'walk', who: 'ally', dur: 5, from: [-16, 2], to: [2, 1] },
+  { type: 'say', speaker: 'Ally', dur: 4,
+    text: "Hey. I'm Ally. Welcome to the city." },
+  { type: 'say', speaker: 'Ally', dur: 5,
+    text: "Don't let the quiet fool you. Thugs own these streets, and the police are never far." },
+  { type: 'say', speaker: 'Ally', dur: 5,
+    text: 'I walk with you, I fight with you, I can drive, and I can get you almost anything. Just ask.' },
+  { type: 'say', speaker: 'Ally', dur: 4,
+    text: "Press T to type to me, or V to talk. Before we start, though... what should I call you?" },
+  { type: 'ask', key: 'name',
+    text: 'What should I call you? Type your name and press Enter.' },
+  { type: 'say', speaker: 'Ally', dur: 4,
+    text: a => `${a.name || 'Hunter'}. Good name. Let's make it a legend.` },
+  { type: 'say', speaker: 'Ally', dur: 5,
+    text: 'The Bank is across town. Get there, and we will see what this city is hiding.' }
+];
+
+function setActor(who, x, z, moving, yaw) {
+  const a = who === 'ally' ? companion : player;
+  a.x = x;
+  a.z = z;
+  a.yaw = yaw;
+  a.speed = moving ? 3 : 0;
+  a.sync();
+  animateHuman(a.h, a.speed, now(), 'walk');
+}
+
+function showSubtitle(text, speaker) {
+  const el = $('subtitle');
+  el.textContent = speaker ? `${speaker}: ${text}` : text;
+  el.className = speaker === 'Ally' ? 'ally' : '';
+  if (speaker === 'Ally') {
+    addChat('Ally', text, 'ally');
+    speak(text);
+  }
+}
+
+function askName(prompt) {
+  showSubtitle(prompt, 'Ally');
+  askResolver = value => cutscene.answer('name', value.trim().slice(0, 14) || 'Hunter');
+  openChat();
+  chatInput.placeholder = 'Type your name, then press Enter';
+}
+
+function finishIntro(answers) {
+  askResolver = null;
+  closeChat();
+  $('subtitle').textContent = '';
+  $('titleCard').classList.remove('show');
+  state.name = (answers && answers.name) || 'Hunter';
+  chatInput.placeholder = 'Tell Ally what to do, or type a cheat';
+
+  player.reset(0, 0);
+  companion.setRole('follow');
+  setActor('ally', 2, 1, false, 0);
+  setActor('player', 0, 0, false, 0);
+
+  state.started = true;
+  document.body.className = 'playing';
+  toast('Click the screen to take control', 4000);
+}
+
+const cutscene = new Cutscene({
+  title: text => {
+    const el = $('titleCard');
+    el.textContent = text;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2400);
+  },
+  say: (text, speaker) => showSubtitle(text, speaker),
+  ask: (key, prompt) => askName(prompt),
+  actor: setActor,
+  end: finishIntro
+});
+
+$('btnStart').onclick = () => {
+  requestFull();
+  document.body.className = 'intro';
+  cutscene.start(INTRO_BEATS);
+};
+
+$('btnSkip').onclick = () => cutscene.skip();
+$('btnControls').onclick = () => { $('controls').hidden = !$('controls').hidden; };
+$('btnFull').onclick = toggleFull;
+$('btnPauseFull').onclick = toggleFull;
+$('btnResume').onclick = () => {
+  document.body.className = 'playing';
+  renderer.domElement.requestPointerLock();
+};
+$('btnQuitMenu').onclick = () => location.reload();
+
 // ---------- Wanted level and police ----------
 function crime(level) {
   if (level <= 0) return;
@@ -148,7 +278,6 @@ function clearPolice() {
   policeCars.length = 0;
 }
 
-// Hitting people with a moving car
 function runOver(v) {
   for (const c of [...civilians, ...thugs]) {
     if (!c.alive || Math.hypot(c.x - v.x, c.z - v.z) > 2.2) continue;
@@ -186,7 +315,6 @@ function tracer(a, b) {
   state.tracers.push({ line, life: 0.08 });
 }
 
-// Finds the first person or wall a bullet hits
 function castBullet(origin, dir, range) {
   let best = null, bestT = Infinity;
   for (const target of [...thugs, ...civilians]) {
@@ -311,7 +439,6 @@ function reloadWeapon() {
   else toast('Reloaded', 900);
 }
 
-// Ally shoots the nearest thug in range
 function companionShoot(t) {
   if (!companion.alive || companion.vehicle) return;
   const w = allyArsenal.current();
@@ -448,6 +575,7 @@ function buildState() {
     if (v.driver === null) nearest = Math.min(nearest, Math.hypot(v.x - player.x, v.z - player.z));
   }
   return {
+    playerName: state.name,
     landmarks: Object.keys(world.landmarks),
     cheats: Object.keys(CHEATS),
     weapons: arsenal.slots.map(id => {
@@ -533,7 +661,6 @@ function runAction(a) {
 async function handleCommand(text) {
   addChat('You', text, 'you');
 
-  // Typing a cheat code runs it instantly, without the AI
   const code = text.trim().toUpperCase().replace(/\s+/g, '');
   if (CHEAT_BY_CODE[code]) {
     const id = CHEAT_BY_CODE[code];
@@ -549,29 +676,20 @@ async function handleCommand(text) {
 }
 
 // ---------- Typing and voice ----------
-function openChat() {
-  state.chatOpen = true;
-  for (const k in keys) keys[k] = false;
-  mouseDown = false;
-  chatInput.hidden = false;
-  chatInput.value = '';
-  chatInput.focus();
-  if (document.pointerLockElement) document.exitPointerLock();
-}
-
-function closeChat() {
-  state.chatOpen = false;
-  chatInput.hidden = true;
-  chatInput.blur();
-}
-
 chatInput.addEventListener('keydown', e => {
   e.stopPropagation();
   if (e.key === 'Enter') {
     const text = chatInput.value.trim();
+    if (askResolver) {
+      const resolve = askResolver;
+      askResolver = null;
+      closeChat();
+      resolve(text || 'Hunter');
+      return;
+    }
     closeChat();
     if (text) handleCommand(text);
-  } else if (e.key === 'Escape') {
+  } else if (e.key === 'Escape' && !askResolver) {
     closeChat();
   }
 });
@@ -582,7 +700,16 @@ if (SR) {
   rec = new SR();
   rec.lang = 'en-US';
   rec.interimResults = false;
-  rec.onresult = e => handleCommand(e.results[0][0].transcript);
+  rec.onresult = e => {
+    const said = e.results[0][0].transcript;
+    if (askResolver) {
+      const resolve = askResolver;
+      askResolver = null;
+      resolve(said.trim() || 'Hunter');
+      return;
+    }
+    handleCommand(said);
+  };
   rec.onend = () => { listening = false; $('micBtn').classList.remove('live'); };
   rec.onerror = () => { listening = false; $('micBtn').classList.remove('live'); };
 }
@@ -609,10 +736,15 @@ $('micBtn').onclick = toggleVoice;
 
 // ---------- Input ----------
 window.addEventListener('keydown', e => {
+  // During the intro, only Escape (to skip) is active, and only when no question is waiting
+  if (cutscene.active) {
+    if (e.code === 'Escape' && !cutscene.waiting) cutscene.skip();
+    return;
+  }
   if (state.chatOpen) return;
   if (['Space', 'Tab', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
   keys[e.code] = true;
-  if (e.repeat) return;
+  if (e.repeat || !state.started) return;
 
   if (e.code === 'KeyE') tryEnterOrExit();
   else if (e.code === 'KeyT') { e.preventDefault(); openChat(); }
@@ -639,6 +771,7 @@ renderer.domElement.addEventListener('mousedown', e => {
 window.addEventListener('mouseup', () => { mouseDown = false; });
 
 renderer.domElement.addEventListener('wheel', e => {
+  if (!state.started) return;
   e.preventDefault();
   arsenal.cycle();
   toast(`Weapon: ${arsenal.current().name}`, 1000);
@@ -656,18 +789,14 @@ document.addEventListener('mousemove', e => {
   player.camPitch = clamp(player.camPitch - e.movementY * 0.0025, 0.05, 1.2);
 });
 
+// Releasing the mouse (Esc) opens the pause menu
 document.addEventListener('pointerlockchange', () => {
   const locked = document.pointerLockElement === renderer.domElement;
-  if (locked) $('startOverlay').hidden = true;
-  else if (!state.chatOpen && state.started) $('startOverlay').hidden = false;
+  if (locked) return;
+  if (state.started && !state.chatOpen && document.body.classList.contains('playing')) {
+    document.body.className = 'paused';
+  }
 });
-
-$('playBtn').onclick = () => {
-  state.started = true;
-  $('playBtn').textContent = '▶ Resume';
-  renderer.domElement.requestPointerLock();
-  toast('WASD move · Mouse look · E car · Hold click or F shoot · R reload · Q/wheel switch · T talk to Ally', 5000);
-};
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -720,7 +849,6 @@ function updateHud(t) {
 function update(dt, t) {
   const live = !state.chatOpen;
 
-  // Hold the mouse (or F) to keep firing; each weapon has its own rate
   if (live && (mouseDown || keys.KeyF)) fireWeapon();
 
   player.update(dt, live ? {
@@ -756,7 +884,6 @@ function update(dt, t) {
   for (const th of thugs) th.update(dt, thugTargets, world.solids);
   for (const c of civilians) c.update(dt, player, world.solids);
 
-  // Police damage you when close, and flash their lights
   for (const v of policeCars) {
     if (player.alive && Math.hypot(player.x - v.x, player.z - v.z) < 4.5) player.damage(10 * dt);
     const on = Math.sin(t * 12) > 0;
@@ -764,7 +891,6 @@ function update(dt, t) {
     v.mesh.userData.blue.color.setHex(on ? 0x330000 : 0x2255ff);
   }
 
-  // Wanted level cools down when you stay out of trouble
   if (state.wanted > 0) {
     if (t - state.lastCrime > 12 && t - state.lastDecay > 8) {
       state.wanted--;
@@ -780,7 +906,6 @@ function update(dt, t) {
     }
   }
 
-  // Death and respawn
   if (!player.alive && state.deadAt === null) {
     state.deadAt = t;
     exitVehicle();
@@ -788,7 +913,6 @@ function update(dt, t) {
   }
   if (state.deadAt !== null && t - state.deadAt > 4) respawn();
 
-  // Fade tracers and explosions
   for (let i = state.tracers.length - 1; i >= 0; i--) {
     const tr = state.tracers[i];
     tr.life -= dt;
@@ -821,10 +945,25 @@ function frame() {
   const t = now();
   const dt = Math.min(0.05, t - lastT);
   lastT = t;
-  if (state.started) update(dt, t);
+
+  if (cutscene.active) {
+    const c = cutscene.update(dt);
+    if (c) {
+      camera.position.set(c.pos[0], c.pos[1], c.pos[2]);
+      camera.lookAt(c.look[0], c.look[1], c.look[2]);
+    }
+  } else if (state.started) {
+    update(dt, t);
+  } else {
+    // Main menu: the camera slowly circles the city
+    const a = t * 0.04;
+    camera.position.set(Math.sin(a) * 75, 50, Math.cos(a) * 75);
+    camera.lookAt(0, 0, 0);
+  }
+
   renderer.render(scene, camera);
 }
 
 player.sync();
-updateCamera(0);
+companion.sync();
 frame();
